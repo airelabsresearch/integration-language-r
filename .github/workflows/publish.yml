@@ -1,0 +1,40 @@
+name: Publish container image
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  REGISTRY: org-01kkkppnnytj41vh4x02et4a8q.registry-stage.airelabs.studio
+  IMAGE_NAME: lcoe-r
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install regctl
+        uses: regclient/actions/regctl-installer@main
+
+      - name: Log in to Aire Labs registry
+        run: |
+          echo "${{ secrets.AIRE_API_KEY }}" | regctl registry login "$REGISTRY" \
+            --user api-key \
+            --pass-stdin
+
+      - name: Build image
+        run: |
+          docker build -t "$IMAGE_NAME:latest" .
+          docker tag "$IMAGE_NAME:latest" "$REGISTRY/$IMAGE_NAME:${GITHUB_REF_NAME}"
+
+      - name: Push image with regctl
+        run: |
+          regctl image copy \
+            "docker-daemon:$REGISTRY/$IMAGE_NAME:${GITHUB_REF_NAME}" \
+            "$REGISTRY/$IMAGE_NAME:${GITHUB_REF_NAME}"
