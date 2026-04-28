@@ -5,9 +5,21 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   REGISTRY: org-01kkkppnnytj41vh4x02et4a8q.registry-stage.airelabs.studio
   IMAGE_NAME: lcoe-r
+  # Cloudflare Free/Pro caps request bodies at 100 MB; 50 MB leaves headroom
+  # for HTTP overhead. Without this, regctl uploads each blob as a single
+  # PUT and any layer >=100 MB 413s at the edge — same failure mode as
+  # `docker push`. See examples/container-function-r-slow/push.sh.
+  BLOB_CHUNK_BYTES: "50000000"
 
 jobs:
   publish:
@@ -16,25 +28,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Install regctl
-        uses: regclient/actions/regctl-installer@main
+        uses: regclient/actions/regctl-installer@v0.1.0
 
       - name: Log in to Aire Labs registry
         run: |
-          echo "${{ secrets.AIRE_API_KEY }}" | regctl registry login "$REGISTRY" \
-            --user api-key \
-            --pass-stdin
+          printf '%s' "${{ secrets.AIRE_API_KEY }}" \
+            | regctl registry login "$REGISTRY" --user api-key --pass-stdin
 
-      - name: Build image
+      - name: Configure chunked uploads
         run: |
-          docker build -t "$IMAGE_NAME:latest" .
-          docker tag "$IMAGE_NAME:latest" "$REGISTRY/$IMAGE_NAME:${GITHUB_REF_NAME}"
+          regctl registry set "$REGISTRY" \
+            --blob-max "$BLOB_CHUNK_BYTES" \
+            --blob-chunk "$BLOB_CHUNK_BYTES"
 
-      - name: Push image with regctl
+      - name: Build image (linux/amd64)
         run: |
-          regctl image copy \
-            "docker-daemon:$REGISTRY/$IMAGE_NAME:${GITHUB_REF_NAME}" \
-            "$REGISTRY/$IMAGE_NAME:${GITHUB_REF_NAME}"
+          docker build --platform linux/amd64 -t "$IMAGE_NAME:${GITHUB_REF_NAME}" .
+
+      - name: Export image to tarball
+        run: |
+          docker save "$IMAGE_NAME:${GITHUB_REF_NAME}" -o image.tar
+
+      - name: Push image with regctl (chunked)
+        run: |
+          regctl image import \
+            "$REGISTRY/$IMAGE_NAME:${GITHUB_REF_NAME}" \
+            image.tar
