@@ -15,10 +15,6 @@ concurrency:
 env:
   REGISTRY: org-01kkkppnnytj41vh4x02et4a8q.registry-stage.airelabs.studio
   IMAGE_NAME: lcoe-r
-  # Cloudflare Free/Pro caps request bodies at 100 MB; 50 MB leaves headroom
-  # for HTTP overhead. Without this, regctl uploads each blob as a single
-  # PUT and any layer >=100 MB 413s at the edge — same failure mode as
-  # `docker push`. See examples/container-function-r-slow/push.sh.
   BLOB_CHUNK_BYTES: "50000000"
 
 jobs:
