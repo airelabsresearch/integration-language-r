@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  REGISTRY: org-01kkkppnnytj41vh4x02et4a8q.registry-stage.airelabs.studio
+  REGISTRY: org-01jvsy2crqz5eq4ann3zyjva9a.registry.airelabs.run
   IMAGE_NAME: lcoe-r
   BLOB_CHUNK_BYTES: "50000000"
 
