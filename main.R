@@ -7,6 +7,7 @@
 source("R/airelabs.R")
 source("R/model.R")
 source("R/data_lookup.R")
+source("R/hook_schema.R")
 
 main <- function() {
   params <- read_hook_input()
@@ -14,7 +15,7 @@ main <- function() {
   dataset        <- require_string(params, "dataset")
   target_year    <- as.integer(require_number(params, "target_year"))
   discount_rate  <- require_number(params, "discount_rate")
-  lifetime_years <- as.integer(require_number(params, "lifetime_years", expected_unit = "years"))
+  lifetime_years <- as.integer(require_number(params, "lifetime_years", expected_unit = input_unit("lifetime_years")))
 
   # Load cost assumptions from the bundled CSV
   costs <- load_cost_assumptions(dataset, target_year)
@@ -25,8 +26,8 @@ main <- function() {
   if (discount_rate <= 0) {
     write_hook_output(list(
       string_result("dataset",          dataset),
-      number_result("capex",            costs$capex,           "USD/kW"),
-      number_result("opex",             costs$opex,            "USD/kW/yr"),
+      number_result("capex",            costs$capex,           output_unit("capex")),
+      number_result("opex",             costs$opex,            output_unit("opex")),
       number_result("capacity_factor",  costs$capacity_factor),
       error_result("lcoe",              "INVALID_DISCOUNT_RATE")
     ))
@@ -44,10 +45,10 @@ main <- function() {
 
   write_hook_output(list(
     string_result("dataset",          dataset),
-    number_result("capex",            costs$capex,           "USD/kW"),
-    number_result("opex",             costs$opex,            "USD/kW/yr"),
+    number_result("capex",            costs$capex,           output_unit("capex")),
+    number_result("opex",             costs$opex,            output_unit("opex")),
     number_result("capacity_factor",  costs$capacity_factor),
-    number_result("lcoe",             lcoe,                  "USD/MWh")
+    number_result("lcoe",             lcoe,                  output_unit("lcoe"))
   ))
 
   message(sprintf("OK — dataset=%s, year=%d, lcoe=%.2f USD/MWh", dataset, target_year, lcoe))
