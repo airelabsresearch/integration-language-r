@@ -41,10 +41,29 @@ jobs:
             --blob-max "$BLOB_CHUNK_BYTES" \
             --blob-chunk "$BLOB_CHUNK_BYTES"
 
+      # hook-schema.json declares this container's inputs and outputs. Validate
+      # it against the published JSON Schema: the registry does not fail a push
+      # with a bad label, it ignores the label and shows the reason on the
+      # Container Registry page and in Configure Code Block.
+      - name: Validate hook-schema.json
+        run: |
+          pipx run --spec check-jsonschema==0.38.2 check-jsonschema \
+            --schemafile https://app.airelabs.com/schemas/v1/siro.v1alpha2.HookSchema.jsonschema.strict.bundle.json \
+            hook-schema.json
+
+      # The image label com.airelabs.schema.v1.hook carries the declaration to
+      # the registry, which lets Configure Code Block pre-fill and check inputs.
       - name: Build image to OCI layout (linux/amd64)
         run: |
+          HOOK_SCHEMA="$(jq -c . hook-schema.json)"
+          # The registry rejects a label over 32 KB without failing the push.
+          if (( $(printf '%s' "$HOOK_SCHEMA" | wc -c) > 32768 )); then
+            echo "hook-schema.json is over 32768 bytes minified; the registry would reject it." >&2
+            exit 1
+          fi
           docker buildx build \
             --platform linux/amd64 \
+            --label "com.airelabs.schema.v1.hook=$HOOK_SCHEMA" \
             --output "type=oci,dest=oci-layout,tar=false,name=$IMAGE_NAME:${GITHUB_REF_NAME}" \
             .
 

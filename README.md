@@ -30,6 +30,30 @@ Inspect the output: `cat /tmp/airelabs/hook-output.json`
 ```bash
 docker run --rm lcoe-r Rscript tests/test_model.R
 docker run --rm lcoe-r Rscript tests/test_main.R
+docker run --rm lcoe-r Rscript tests/test_hook_schema.R
+```
+
+## Declared inputs and outputs
+
+[`hook-schema.json`](hook-schema.json) declares the inputs this container reads and the outputs it writes. The publish workflow puts it in the image label `com.airelabs.schema.v1.hook`. When someone picks this image under **Registry image** in Aire's **Configure Code Block** dialog, the dialog reads the declaration. It lists each input with its description, blocks **Save** until every required input is mapped, and sets **Send as** to the declared unit. It also pre-fills the outputs.
+
+The file is the only copy of the declaration. `main.R` reads its expected units from it through `R/hook_schema.R`, and `tests/test_hook_schema.R` checks that the fixtures and the results match it.
+
+Unit names are the ones Aire sends: `yr`, not `years`; `USD/kWyr`, not `USD/kW/yr`. A declared unit Aire cannot produce makes every run fail its unit check.
+
+The publish workflow validates the file against the published [JSON Schema](https://app.airelabs.com/schemas/v1/siro.v1alpha2.HookSchema.jsonschema.strict.bundle.json) before it builds. To check it yourself:
+
+```bash
+pipx run check-jsonschema --schemafile https://app.airelabs.com/schemas/v1/siro.v1alpha2.HookSchema.jsonschema.strict.bundle.json hook-schema.json
+```
+
+The registry does not fail a push with a bad label. It ignores the label and shows the reason on the **Container Registry** page, next to the tag, and in the **Configure Code Block** dialog. The file cannot carry a `$schema` key, because the registry rejects any key it does not know.
+
+To build locally with the label:
+
+```bash
+docker build --label "com.airelabs.schema.v1.hook=$(jq -c . hook-schema.json)" -t lcoe-r .
+docker inspect lcoe-r --format '{{ index .Config.Labels "com.airelabs.schema.v1.hook" }}'
 ```
 
 ## Try other inputs
